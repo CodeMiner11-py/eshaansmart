@@ -198,7 +198,10 @@ class Customer:
             self.canvas.after(750, self.cash_register_advance)
         else:
             print("money given")
-            money += 7.50
+            addition = 0
+            for item in self.inventory:
+                addition += 4.50
+            money += addition
             register.cashout()
             self.canvas.after(0, self.exit_advance())
 
@@ -609,7 +612,7 @@ if bob:
 
     def sixth_checking():
         global watermelon_tree, watermelon_stand
-        if money > 300:
+        if money >= 300:
             thing = Obj()
             thing.pos = (10, 1)
             worker3 = Worker("worker.png", 5, 5, gamecanvas, group, orange_tree, thing, (7, 7))
@@ -619,7 +622,7 @@ if bob:
 
     def fifth_checking():
         global watermelon_tree, watermelon_stand
-        if money > 250:
+        if money >= 250:
             watermelon_tree = PlayerGiver("watermelon-tree.png", 2, 2, gamecanvas, "watermelon.png", 5000)
             watermelon_stand = PlayerReceiver(4, 2, "watermelon-stand.png", gamecanvas, "watermelon.png")
             stands.append(watermelon_stand)
@@ -629,7 +632,7 @@ if bob:
             gameboard.after(100, fifth_checking)
 
     def fourth_checking():
-        if money > 200:
+        if money >= 200:
             thing = Obj()
             thing.pos = (11, 5)
             worker2 = Worker("worker.png", 7, 7, gamecanvas, group, apple_tree, thing, (4, 4))
@@ -641,7 +644,7 @@ if bob:
 
     def third_checking():
         global orange_tree, orange_stand
-        if money > 150:
+        if money >= 150:
             orange_tree = PlayerGiver("orange-tree.png", 7, 1, gamecanvas, "orange.png", 5000)
             orange_stand = PlayerReceiver(9, 1, "orange-stand.png", gamecanvas, "orange.png")
             stands.append(orange_stand)
@@ -653,7 +656,7 @@ if bob:
 
     def second_checking():
         global worker1
-        if money > 100:
+        if money >= 100:
             thing = Obj()
             thing.pos = (5, 0)
             worker1 = Worker("worker.png", 0, 0, gamecanvas, group, banana_tree, thing, (3, 3))
@@ -665,7 +668,7 @@ if bob:
 
     def checking():
         global apple_stand, apple_tree
-        if money > 50:
+        if money >= 50:
             apple_stand = PlayerReceiver(10, 5, "apple-stand.png", gamecanvas, "apple.png")
             stands.append(apple_stand)
 
