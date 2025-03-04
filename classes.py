@@ -1,4 +1,4 @@
-import random, copy
+import random
 from tkinter import *
 
 
@@ -100,7 +100,6 @@ class Player:
         self.canvas.after(100, self.check_for_pick_up)
 
     def glide(self, row, column):
-        print(f"Attempting to glide to {row}, {column}")  # Debugging line
         if (row >= 0 and row < 8 and column >= 0 and column < 12) or isinstance(self, Worker):
             self.moving = (True, (row, column))
             self.target_row, self.target_column = self.moving[1]
@@ -121,6 +120,7 @@ class Player:
         elif column > self.target_column:
             column -= 1
 
+        # Correct position before moving
         self.pos = (row, column)  # Correctly update the position
         calculated = self.calculate_pos()
         self.move(calculated[0], calculated[1], plusminus=False)
@@ -130,6 +130,9 @@ class Player:
             self.canvas.after(100, self._glide_step)
         else:
             self.moving = (False, None)
+            # Ensure worker is exactly at target position without any offset
+            self.pos = (self.target_row, self.target_column)
+            self.move(self.calculate_pos()[0], self.calculate_pos()[1], plusminus=False)
 
     def bind(self, tk_window):
         tk_window.bind("<Up>", (lambda _: self.glide(self.pos[0] - 1, self.pos[1])))
@@ -140,6 +143,7 @@ class Player:
         tk_window.bind("s", (lambda _: self.glide(self.pos[0] + 1, self.pos[1])))
         tk_window.bind("a", (lambda _: self.glide(self.pos[0], self.pos[1] - 1)))
         tk_window.bind("d", (lambda _: self.glide(self.pos[0], self.pos[1] + 1)))
+
 
 class Customer:
     def __init__(self, row, column, image, canvas, reciever, speed):
@@ -154,6 +158,50 @@ class Customer:
         self.stage = random.choice(["row", "column"])
         self.advance()
 
+    def exit_advance(self):
+        if self.pos != (0, 0):
+            trow, tcolumn = (0, 0)
+            row, column = self.pos
+            if row < trow:
+                row += 1
+            if row > trow:
+                row -= 1
+            if column > tcolumn:
+                column -= 1
+            if column < tcolumn:
+                column += 1
+
+            self.pos = row, column
+            self.coords(calc(row, column)[0], calc(row, column)[1])
+            self.canvas.after(750, self.exit_advance)
+        else:
+            customers.remove(self)
+            self.canvas.delete(self.id)
+            del self
+
+    def cash_register_advance(self):
+        global money
+        if self.pos != register.pos:
+            trow, tcolumn = register.pos
+            row, column = self.pos
+            if row < trow:
+                row += 1
+            if row > trow:
+                row -= 1
+            if column > tcolumn:
+                column -= 1
+            if column < tcolumn:
+                column += 1
+
+            self.pos = row, column
+            self.coords(calc(row, column)[0], calc(row, column)[1])
+            self.canvas.after(750, self.cash_register_advance)
+        else:
+            print("money given")
+            money += 7.50
+            register.cashout()
+            self.canvas.after(0, self.exit_advance())
+
     def complete(self):
         global money
         removed = []
@@ -163,44 +211,32 @@ class Customer:
         # Check if the receiver has the items to give
         if self.reciever.inventory:  # If there are items to give
             # Process taking items from the receiver's inventory
-            for i in self.reciever.inventory[:]:
-                removed.append(copy.copy(self.reciever.inventory[0]))
-                counter -= 1
-                if counter == 0:
-                    break
+
+            # Move the items to the customer's inventory
             for i in range(number):
                 try:
-                    self.reciever.inventory.pop()
+                    self.inventory.append(self.reciever.inventory.pop())
                 except IndexError:
                     pass
 
-            # Move the items to the customer's inventory
-            for i in removed:
-                self.inventory.append(i)
-
             print("Customer has received the items!")
             self.stage = "done"  # Set the task to done
-            self.coords(0, 0)
-            self.pos = (0, 0)
-            money += 7.50
-            customers.remove(self)
-            self.canvas.delete(self.id)
-            del self
+            self.cash_register_advance()
 
         else:
             # Wait for restocking, the customer will stay at the receiver and keep checking
             print("Waiting for restock...")
-            print(self.reciever.inventory)
             self.canvas.after(1000, self.complete)  # Keep checking every 1 second
 
     def coords(self, x, y):
         self.canvas.coords(self.id, x, y)
         counter = 1
         for item in self.inventory:
-            item.canvas.coords(item.id, self.x + (15 * counter), self.y)
-            item.x = self.x + (15 * counter)
-            item.y = self.y
+            item.canvas.coords(item.id, x + 15 * counter, y)  # Position the food above the customer
+            item.x = x + 15 * counter
+            item.y = y
             counter += 1
+        self.canvas.tag_raise(self.id)
 
     def advance(self, finishing=False, target_row=100, target_column=100):
         global money
@@ -257,21 +293,16 @@ class Customer:
                 if current_column < 0:
                     current_column += 2  # Reverse the movement if out of bounds
 
+        self.pos = (current_row, current_column)
+
         if self.stage != "done":
             if not finishing:
                 self.pos = (current_row, current_column)
                 self.x, self.y = calc(current_row, current_column)
                 self.coords(self.x, self.y)
-                self.canvas.after(self.speed, self.advance)
-            else:
-                self.canvas.after(self.speed, self.advance)
+            self.canvas.after(self.speed, self.advance)
         else:
-            if not finishing:
-                self.complete()
-            else:
-                money += 1.50 * len(self.inventory)  # Assuming each product costs $7.50
-                customers.remove(self)
-                del self
+            self.complete()
 
 
 class FoodItem:
@@ -298,6 +329,37 @@ class FoodItem:
 def calc(row, column):
     return (row * square[1][0], column * square[1][1])
 
+
+class CashRegister:
+    def __init__(self, imagefile, row, column, canvas, cashierfile):
+        self.imagefile = imagefile
+        self.pos = (row, column)
+        self.canvas = canvas
+        self.PhotoImage = PhotoImage(file=imagefile)
+        self.id = canvas.create_image(calc(row, column)[0], calc(row, column)[1], anchor=NW, image=self.PhotoImage)
+        self.cashier_imagefile = cashierfile
+        self.cashier_PhotoImage = PhotoImage(file=self.cashier_imagefile)
+        self.cashier_id = canvas.create_image(calc(row + 1, column)[0], calc(row + 1, column)[1], anchor=NW,
+                                              image=self.cashier_PhotoImage)
+        self.money_fade_level = 10
+        self.money_PhotoImage = PhotoImage(file="money.png")
+        self.money_id = None
+
+    def cashout(self, restart=True):
+        if self.money_fade_level == 10 or restart:
+            self.money_id = self.canvas.create_image(calc(self.pos[0], self.pos[1])[0] + 15,
+                                                     calc(self.pos[0], self.pos[1])[1], anchor=NW,
+                                                     image=self.money_PhotoImage)
+            self.money_fade_level = 9
+            self.canvas.after(250, (lambda: self.cashout(False)))
+        else:
+            self.canvas.move(self.money_id, 0, -self.money_fade_level)
+            self.money_fade_level -= 1
+            if self.money_fade_level != -1:
+                self.canvas.after(250, (lambda: self.cashout(False)))
+            else:
+                self.canvas.delete(self.money_id)
+                self.money_id = None
 
 class PlayerReceiver:
     def __init__(self, row, column, image_file, canvas, image_to_get):
@@ -386,6 +448,7 @@ class PlayerGiver:
                 self.counter = 0
         self.canvas.after(self.producing_time, self.give)
 
+
 class Worker(Player):
     def __init__(self, image, row, column, canvas, tile_group, tree, stand, home):
         super().__init__(image, row, column, canvas, tile_group)
@@ -397,7 +460,7 @@ class Worker(Player):
 
     def go(self):
         if True:
-            self.pathfind(self.tree.pos[0], self.tree.pos[1])
+            self.pathfind(self.tree.pos[1], self.tree.pos[0])
             print("Gliding to tree at", self.tree.pos[0], self.tree.pos[1])
             self.canvas.after(
                 1000 * self.calculate_distance(self.pos[0], self.pos[1], self.tree.pos[0], self.tree.pos[1]),
@@ -406,7 +469,7 @@ class Worker(Player):
 
     def wait_at_tree(self):
         print("Waited at tree, going to stand at", self.stand.pos[0], self.stand.pos[1])
-        self.pathfind(self.stand.pos[1]-1, self.stand.pos[0])
+        self.pathfind(self.stand.pos[1], self.stand.pos[0])
         self.canvas.after(
             1000 * self.calculate_distance(self.pos[0], self.pos[1], self.stand.pos[0], self.stand.pos[1]),
             self.wait_at_stand)
@@ -472,6 +535,11 @@ class Worker(Player):
             self.glide(next_row, next_column)
             self.canvas.after(500, lambda: self.move_along_path(path, step + 1))
 
+
+class Obj:
+    pass
+
+
 # Grid settings
 grid = ("607x910", (607, 910))
 grid_squares = ("8x12", (8, 12))
@@ -491,7 +559,7 @@ gamecanvas = Canvas(gameboard, height=607, width=910)
 gamecanvas.pack(fill=BOTH, expand=True)
 gamecanvas.create_image(0, 0, anchor=NW, image=gridimage)
 
-gameboard.resizable(False, False)
+# gameboard.resizable(False, False)
 
 groundfoods = []
 players = []
@@ -515,16 +583,22 @@ apple_tree = None
 
 worker1 = None
 
+
 def random_customer():
     if len(customers) < 5:
         customer = Customer(0, 0, "customer.png", gamecanvas, random.choice(stands), 500)
         customers.append(customer)
     gamecanvas.after(12000, random_customer)
 
+
+register = CashRegister("cash-register.png", 8, 3, gamecanvas, "worker.png")
+
 bob = True
 
 orange_tree = None
 orange_stand = None
+watermelon_tree = None
+watermelon_stand = None
 
 if bob:
     banana_stand = PlayerReceiver(5, 1, "banana-stand.png", gamecanvas, "banana.png")
@@ -533,6 +607,38 @@ if bob:
     banana_tree = PlayerGiver("banana-tree.png", 5, 5, gamecanvas, "banana.png", 5000)
     plants.append(banana_tree)
 
+    def sixth_checking():
+        global watermelon_tree, watermelon_stand
+        if money > 300:
+            thing = Obj()
+            thing.pos = (10, 1)
+            worker3 = Worker("worker.png", 5, 5, gamecanvas, group, orange_tree, thing, (7, 7))
+            players.append(worker3)
+        else:
+            gameboard.after(100, sixth_checking)
+
+    def fifth_checking():
+        global watermelon_tree, watermelon_stand
+        if money > 250:
+            watermelon_tree = PlayerGiver("watermelon-tree.png", 2, 2, gamecanvas, "watermelon.png", 5000)
+            watermelon_stand = PlayerReceiver(4, 2, "watermelon-stand.png", gamecanvas, "watermelon.png")
+            stands.append(watermelon_stand)
+            plants.append(watermelon_tree)
+            sixth_checking()
+        else:
+            gameboard.after(100, fifth_checking)
+
+    def fourth_checking():
+        if money > 200:
+            thing = Obj()
+            thing.pos = (11, 5)
+            worker2 = Worker("worker.png", 7, 7, gamecanvas, group, apple_tree, thing, (4, 4))
+            players.append(worker2)
+            fifth_checking()
+        else:
+            gameboard.after(100, fourth_checking)
+
+
     def third_checking():
         global orange_tree, orange_stand
         if money > 150:
@@ -540,17 +646,22 @@ if bob:
             orange_stand = PlayerReceiver(9, 1, "orange-stand.png", gamecanvas, "orange.png")
             stands.append(orange_stand)
             plants.append(orange_tree)
+            fourth_checking()
         else:
             gameboard.after(100, third_checking)
+
 
     def second_checking():
         global worker1
         if money > 100:
-            worker1 = Worker("worker.png", 0, 0, gamecanvas, group, banana_tree, banana_stand, (3, 3))
+            thing = Obj()
+            thing.pos = (5, 0)
+            worker1 = Worker("worker.png", 0, 0, gamecanvas, group, banana_tree, thing, (3, 3))
             players.append(worker1)
             third_checking()
         else:
             gamecanvas.after(100, second_checking)
+
 
     def checking():
         global apple_stand, apple_tree
@@ -564,11 +675,12 @@ if bob:
         else:
             gamecanvas.after(100, checking)
 
+
     checking()
 
     trash = TrashCan("trash.png", 1, 5, gamecanvas)
 
-    gameboard.after(10000, random_customer)
+    gameboard.after(15000, random_customer)
 
     myguy = Player("monkey.png", 0, 0, gamecanvas, group)
     myguy.bind(gameboard)
