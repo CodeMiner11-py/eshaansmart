@@ -1,8 +1,7 @@
 import random
 from tkinter import *
 
-
-def is_touching(x1, y1, w1, h1, x2, y2, w2, h2):
+def is_touching(x1, y1, w1, h1, x2, y2, w2, h2) -> bool:
     return not (x1 + w1 <= x2 or  # Object 1 is completely left of Object 2
                 x1 >= x2 + w2 or  # Object 1 is completely right of Object 2
                 y1 + h1 <= y2 or  # Object 1 is completely above Object 2
@@ -27,7 +26,7 @@ class TaskGroup:
         self.tasks.append(new_task)
 
 
-class Tile:
+class Tile:  # not much usage, ok to remove (safely)
     def __init__(self):
         self.occupied = False
 
@@ -45,6 +44,8 @@ class TileGroup:
         if column not in self.tiles[row]:
             self.tiles[row][column] = tile
 
+# Player class
+
 
 class Player:
     def __init__(self, image, row, column, canvas, tile_group):
@@ -60,7 +61,7 @@ class Player:
         self.check_for_pick_up()
         self.update_inventory()
 
-    def calculate_pos(self):
+    def calculate_pos(self) -> tuple:
         row = self.pos[0]
         column = self.pos[1]
         squaresize = square[1][0]  # Assuming square is a global or class variable
@@ -80,13 +81,13 @@ class Player:
         self.canvas.coords(self.id, self.x, self.y)
 
         counter = 1
-        for item in self.inventory:
+        for item in self.inventory:  # for showing the inventory
             item.canvas.coords(item.id, self.x + (15 * counter), self.y)
             item.x = self.x + (15 * counter)
             item.y = self.y
             counter += 1
 
-    def check_for_pick_up(self):
+    def check_for_pick_up(self):  # to check for objects on the ground
         for item in groundfoods[::]:
             if is_touching(self.x, self.y, square[1][0], square[1][0],
                            item.x, item.y, item.height, item.height) and len(self.inventory) < 4:
@@ -143,7 +144,7 @@ class Player:
         tk_window.bind("s", (lambda _: self.glide(self.pos[0] + 1, self.pos[1])))
         tk_window.bind("a", (lambda _: self.glide(self.pos[0], self.pos[1] - 1)))
         tk_window.bind("d", (lambda _: self.glide(self.pos[0], self.pos[1] + 1)))
-
+        # bind keys
 
 class Customer:
     def __init__(self, row, column, image, canvas, reciever, speed):
@@ -179,7 +180,7 @@ class Customer:
             self.canvas.delete(self.id)
             del self
 
-    def cash_register_advance(self):
+    def cash_register_advance(self) -> None:
         global money
         if self.pos != register.pos:
             trow, tcolumn = register.pos
@@ -307,7 +308,6 @@ class Customer:
         else:
             self.complete()
 
-
 class FoodItem:
     def __init__(self, icon, canvas, x, y, height):
         self.x = x
@@ -329,7 +329,7 @@ class FoodItem:
         self.canvas.coords(self.id, self.x, self.y)
 
 
-def calc(row, column):
+def calc(row, column) -> tuple:
     return (row * square[1][0], column * square[1][1])
 
 
@@ -345,7 +345,7 @@ class CashRegister:
         self.cashier_id = canvas.create_image(calc(row + 1, column)[0], calc(row + 1, column)[1], anchor=NW,
                                               image=self.cashier_PhotoImage)
         self.money_fade_level = 10
-        self.money_PhotoImage = PhotoImage(file="money.png")
+        self.money_PhotoImage = PhotoImage(file="assets/money.png")
         self.money_id = None
 
     def cashout(self, restart=True):
@@ -461,7 +461,7 @@ class Worker(Player):
         self.check_for_foods()
         self.home = home
 
-    def go(self):
+    def go(self) -> None:
         if True:
             self.pathfind(self.tree.pos[1], self.tree.pos[0])
             print("Gliding to tree at", self.tree.pos[0], self.tree.pos[1])
@@ -484,7 +484,7 @@ class Worker(Player):
         self.canvas.after(1000 * self.calculate_distance(self.pos[0], self.pos[1], 0, 0), self.go)
         print(self.pos)
 
-    def calculate_distance(self, start_row, start_column, end_row, end_column):
+    def calculate_distance(self, start_row, start_column, end_row, end_column) -> int:
         return abs(end_row - start_row) + abs(end_column - start_column)
 
     def pathfind(self, target_row, target_column):
@@ -545,6 +545,7 @@ class Obj:
 
 # Grid settings
 grid = ("607x910", (607, 910))
+original_width, original_height = grid[1]
 grid_squares = ("8x12", (8, 12))
 square = ("75.875x75.875", (75.875, 75.875))
 
@@ -556,11 +557,14 @@ for i in range(0, grid_squares[1][0]):
 # Setup the game
 gameboard = Tk()
 gameboard.title("Eshaan's Mart")
-gridimage = PhotoImage(file="grid.png")
+gridimage = PhotoImage(file="assets/grid.png")
 
 gamecanvas = Canvas(gameboard, height=607, width=910)
 gamecanvas.pack(fill=BOTH, expand=True)
 gamecanvas.create_image(0, 0, anchor=NW, image=gridimage)
+
+iconimg = PhotoImage(file="assets/app-icon.png")
+gameboard.iconphoto(False, iconimg)
 
 # gameboard.resizable(False, False)
 
@@ -574,27 +578,23 @@ money = 10
 
 money_text = gamecanvas.create_text(900, 10, text=f"${money:.2f}", fill="black", font=("Avenir", 22), anchor=NE)
 
-
 def update_money():
     gamecanvas.itemconfigure(money_text, text=f"${money:.2f}")
     gamecanvas.after(500, update_money)
 
-
 update_money()
 apple_stand = None
 apple_tree = None
-
 worker1 = None
-
 
 def random_customer():
     if len(customers) < 5:
-        customer = Customer(0, 0, "customer.png", gamecanvas, random.choice(stands), 500)
+        customer = Customer(0, 0, "assets/customer.png", gamecanvas, random.choice(stands), 500)
         customers.append(customer)
     gamecanvas.after(12000, random_customer)
 
 
-register = CashRegister("cash-register.png", 8, 3, gamecanvas, "worker.png")
+register = CashRegister("assets/cash-register.png", 8, 3, gamecanvas, "assets/worker.png")
 
 bob = True
 
@@ -604,27 +604,29 @@ watermelon_tree = None
 watermelon_stand = None
 
 if bob:
-    banana_stand = PlayerReceiver(5, 1, "banana-stand.png", gamecanvas, "banana.png")
+    banana_stand = PlayerReceiver(5, 1, "assets/banana-stand.png", gamecanvas, "assets/banana.png")
     stands.append(banana_stand)
 
-    banana_tree = PlayerGiver("banana-tree.png", 5, 5, gamecanvas, "banana.png", 5000)
+    banana_tree = PlayerGiver("assets/banana-tree.png", 5, 5, gamecanvas, "assets/banana.png", 5000)
     plants.append(banana_tree)
 
     def sixth_checking():
         global watermelon_tree, watermelon_stand
-        if money >= 300:
+        if money >= 100:
             thing = Obj()
             thing.pos = (10, 1)
-            worker3 = Worker("worker.png", 5, 5, gamecanvas, group, orange_tree, thing, (7, 7))
+            thing2 = Obj()
+            thing.pos = (7, 0)
+            worker3 = Worker("assets/worker.png", 5, 5, gamecanvas, group, thing2, thing, (7, 7))
             players.append(worker3)
         else:
             gameboard.after(100, sixth_checking)
 
     def fifth_checking():
         global watermelon_tree, watermelon_stand
-        if money >= 250:
-            watermelon_tree = PlayerGiver("watermelon-tree.png", 2, 2, gamecanvas, "watermelon.png", 5000)
-            watermelon_stand = PlayerReceiver(4, 2, "watermelon-stand.png", gamecanvas, "watermelon.png")
+        if money >= 85:
+            watermelon_tree = PlayerGiver("assets/watermelon-tree.png", 2, 2, gamecanvas, "assets/watermelon.png", 5000)
+            watermelon_stand = PlayerReceiver(4, 2, "assets/watermelon-stand.png", gamecanvas, "assets/watermelon.png")
             stands.append(watermelon_stand)
             plants.append(watermelon_tree)
             sixth_checking()
@@ -632,10 +634,10 @@ if bob:
             gameboard.after(100, fifth_checking)
 
     def fourth_checking():
-        if money >= 200:
+        if money >= 70:
             thing = Obj()
             thing.pos = (11, 5)
-            worker2 = Worker("worker.png", 7, 7, gamecanvas, group, apple_tree, thing, (4, 4))
+            worker2 = Worker("assets/worker.png", 7, 7, gamecanvas, group, apple_tree, thing, (4, 4))
             players.append(worker2)
             fifth_checking()
         else:
@@ -644,9 +646,9 @@ if bob:
 
     def third_checking():
         global orange_tree, orange_stand
-        if money >= 150:
-            orange_tree = PlayerGiver("orange-tree.png", 7, 1, gamecanvas, "orange.png", 5000)
-            orange_stand = PlayerReceiver(9, 1, "orange-stand.png", gamecanvas, "orange.png")
+        if money >= 55:
+            orange_tree = PlayerGiver("assets/orange-tree.png", 7, 1, gamecanvas, "assets/orange.png", 5000)
+            orange_stand = PlayerReceiver(9, 1, "assets/orange-stand.png", gamecanvas, "assets/orange.png")
             stands.append(orange_stand)
             plants.append(orange_tree)
             fourth_checking()
@@ -656,10 +658,10 @@ if bob:
 
     def second_checking():
         global worker1
-        if money >= 100:
+        if money >= 40:
             thing = Obj()
             thing.pos = (5, 0)
-            worker1 = Worker("worker.png", 0, 0, gamecanvas, group, banana_tree, thing, (3, 3))
+            worker1 = Worker("assets/worker.png", 0, 0, gamecanvas, group, banana_tree, thing, (3, 3))
             players.append(worker1)
             third_checking()
         else:
@@ -668,11 +670,11 @@ if bob:
 
     def checking():
         global apple_stand, apple_tree
-        if money >= 50:
-            apple_stand = PlayerReceiver(10, 5, "apple-stand.png", gamecanvas, "apple.png")
+        if money >= 25:
+            apple_stand = PlayerReceiver(10, 5, "assets/apple-stand.png", gamecanvas, "assets/apple.png")
             stands.append(apple_stand)
 
-            apple_tree = PlayerGiver("apple-tree.png", 3, 5, gamecanvas, "apple.png", 5000)
+            apple_tree = PlayerGiver("assets/apple-tree.png", 3, 5, gamecanvas, "assets/apple.png", 5000)
             plants.append(apple_tree)
             second_checking()
         else:
@@ -681,11 +683,11 @@ if bob:
 
     checking()
 
-    trash = TrashCan("trash.png", 1, 5, gamecanvas)
+    trash = TrashCan("assets/trash.png", 1, 5, gamecanvas)
 
     gameboard.after(15000, random_customer)
 
-    myguy = Player("monkey.png", 0, 0, gamecanvas, group)
+    myguy = Player("assets/monkey.png", 0, 0, gamecanvas, group)
     myguy.bind(gameboard)
     players.append(myguy)
 
